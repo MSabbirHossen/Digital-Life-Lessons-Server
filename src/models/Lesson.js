@@ -83,4 +83,14 @@ const lessonSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// ✅ Add database indexes for query optimization
+lessonSchema.index({ userId: 1 });
+lessonSchema.index({ visibility: 1 });
+lessonSchema.index({ category: 1 });
+lessonSchema.index({ emotionalTone: 1 });
+lessonSchema.index({ createdAt: -1 });
+lessonSchema.index({ favoritesCount: -1 });
+lessonSchema.index({ visibility: 1, accessLevel: 1 });
+lessonSchema.index({ isFeatured: 1 });
+
 export default mongoose.model("Lesson", lessonSchema);

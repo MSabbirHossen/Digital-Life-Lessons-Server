@@ -1,10 +1,13 @@
 import admin from "../config/firebase.js";
+import User from "../models/User.js";
 
 export const verifyToken = async (req, res, next) => {
   const token = req.headers.authorization?.split("Bearer ")[1];
 
   if (!token) {
-    return res.status(401).json({ message: "No token provided" });
+    return res
+      .status(401)
+      .json({ success: false, message: "No token provided" });
   }
 
   try {
@@ -13,23 +16,30 @@ export const verifyToken = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Token verification error:", error.message);
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
   }
 };
 
 export const verifyAdmin = async (req, res, next) => {
   if (!req.user) {
-    return res.status(401).json({ message: "Authentication required" });
+    return res
+      .status(401)
+      .json({ success: false, message: "Authentication required" });
   }
 
   try {
-    const user = await req.db.User.findOne({ uid: req.user.uid });
+    const user = await User.findOne({ uid: req.user.uid });
     if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Admin access required" });
     }
     req.dbUser = user;
     next();
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("Admin verification error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

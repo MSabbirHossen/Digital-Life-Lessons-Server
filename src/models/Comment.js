@@ -21,4 +21,9 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// ✅ Add database indexes for query optimization
+commentSchema.index({ lessonId: 1 });
+commentSchema.index({ userId: 1 });
+commentSchema.index({ createdAt: -1 });
+
 export default mongoose.model("Comment", commentSchema);

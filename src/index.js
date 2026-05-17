@@ -1,9 +1,14 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { config } from "./config/config.js";
 import { connectDB } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import {
+  generalLimiter,
+  stripeLimiter,
+} from "./middleware/rateLimitMiddleware.js";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -12,20 +17,58 @@ import stripeRoutes from "./routes/stripeRoutes.js";
 
 const app = express();
 
+// ✅ Security headers via Helmet
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (config.nodeEnv !== "test") {
+      console.info(
+        `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`,
+      );
+    }
+  });
+  next();
+});
+
 // Middleware
 app.use(
   cors({
-    origin: config.clientUrl,
+    origin(origin, callback) {
+      const allowedOrigins = config.clientUrl
+        .split(",")
+        .map((url) => url.trim())
+        .filter(Boolean);
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
 
+// ✅ General rate limiting
+app.use(generalLimiter);
+
 // Stripe webhook needs raw body - handle before JSON parsing
-app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
+app.use(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  stripeLimiter,
+);
 
 // JSON middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" })); // Set body size limit
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -34,12 +77,12 @@ app.use("/api/stripe", stripeRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.json({ message: "✅ Server is running" });
+  res.json({ success: true, message: "✅ Server is running" });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({ success: false, message: "Route not found" });
 });
 
 // Error handler (must be last)

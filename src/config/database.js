@@ -17,6 +17,8 @@ export const connectDB = async () => {
       .connect(config.mongodbUri, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        minPoolSize: 1,
       })
       .then((mongoose) => {
         console.log("✅ MongoDB connected successfully");

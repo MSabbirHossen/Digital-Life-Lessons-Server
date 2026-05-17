@@ -8,8 +8,9 @@ export const errorHandler = (err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || "Internal server error";
 
+  // ✅ Never expose internal error details to client
   res.status(status).json({
-    message,
-    status,
+    success: false,
+    message: status === 500 ? "Server error" : message,
   });
 };

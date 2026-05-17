@@ -2,11 +2,32 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// ✅ Validate required environment variables
+const requiredEnvVars = [
+  "MONGODB_URI",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_PRIVATE_KEY_ID",
+  "FIREBASE_PRIVATE_KEY",
+  "FIREBASE_CLIENT_EMAIL",
+  "FIREBASE_CLIENT_ID",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+];
+
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error("❌ CRITICAL: Missing required environment variables:");
+  missingEnvVars.forEach((envVar) => console.error(`   - ${envVar}`));
+  console.error("\nPlease set these variables in your .env file");
+  process.exit(1);
+}
+
 export const config = {
-  port: process.env.PORT || 5000,
+  port: parseInt(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
   mongodbUri: process.env.MONGODB_URI,
-  clientUrl: process.env.CLIENT_URL || "http://localhost:5173" || "https://digital-life-lessons-client.vercel.app",
+  clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
 
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,

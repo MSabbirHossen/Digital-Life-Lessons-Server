@@ -1,5 +1,9 @@
 import User from "../models/User.js";
 import admin from "../config/firebase.js";
+import Lesson from "../models/Lesson.js";
+import Favorite from "../models/Favorite.js";
+import Comment from "../models/Comment.js";
+import LessonReport from "../models/LessonReport.js";
 
 // Register or update user in database
 export const registerUser = async (req, res) => {
@@ -7,7 +11,9 @@ export const registerUser = async (req, res) => {
     const { uid, name, email, photoURL } = req.body;
 
     if (!uid || !name || !email) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
     }
 
     let user = await User.findOne({ uid });
@@ -22,7 +28,7 @@ export const registerUser = async (req, res) => {
       await user.save();
       return res
         .status(201)
-        .json({ message: "User created successfully", user });
+        .json({ success: true, message: "User created successfully", user });
     }
 
     // Update existing user
@@ -30,10 +36,12 @@ export const registerUser = async (req, res) => {
     user.photoURL = photoURL || user.photoURL;
     await user.save();
 
-    res.json({ message: "User updated successfully", user });
+    res.json({ success: true, message: "User updated successfully", user });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({ message: "Server error during registration" });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error during registration" });
   }
 };
 
@@ -43,31 +51,78 @@ export const getCurrentUser = async (req, res) => {
     const user = await User.findOne({ uid: req.user.uid }).select("-__v");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    res.json(user);
+    res.json({ success: true, user });
   } catch (error) {
     console.error("Error fetching user:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // Get user by ID (for public profile)
 export const getUserById = async (req, res) => {
   try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 9, 1), 24);
+    const skip = (page - 1) * limit;
+    const sort =
+      req.query.sort === "popular" ? { favoritesCount: -1 } : { createdAt: -1 };
+
     const user = await User.findById(req.params.id).select(
-      "name email photoURL lessonsCreated createdAt",
+      "name photoURL lessonsCreated createdAt isPremium",
     );
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    res.json(user);
+    const lessonQuery = { userId: user._id, visibility: "Public" };
+    const [total, publicLessons, totals] = await Promise.all([
+      Lesson.countDocuments(lessonQuery),
+      Lesson.find(lessonQuery)
+        .populate("userId", "name photoURL lessonsCreated")
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
+      Lesson.aggregate([
+        { $match: lessonQuery },
+        {
+          $group: {
+            _id: null,
+            likes: { $sum: "$likesCount" },
+            favorites: { $sum: "$favoritesCount" },
+            views: { $sum: "$views" },
+          },
+        },
+      ]),
+    ]);
+
+    res.json({
+      success: true,
+      user,
+      lessons: publicLessons,
+      stats: {
+        publicLessons: total,
+        likes: totals[0]?.likes || 0,
+        favorites: totals[0]?.favorites || 0,
+        views: totals[0]?.views || 0,
+      },
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching user:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -78,17 +133,19 @@ export const updateUserProfile = async (req, res) => {
     const user = await User.findOne({ uid: req.user.uid });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     if (name) user.name = name;
     if (photoURL) user.photoURL = photoURL;
 
     await user.save();
-    res.json({ message: "Profile updated successfully", user });
+    res.json({ success: true, message: "Profile updated successfully", user });
   } catch (error) {
     console.error("Error updating profile:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -104,13 +161,15 @@ export const promoteToAdmin = async (req, res) => {
     );
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    res.json({ message: "User promoted to admin", user });
+    res.json({ success: true, message: "User promoted to admin", user });
   } catch (error) {
     console.error("Error promoting user:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -122,13 +181,136 @@ export const deleteUser = async (req, res) => {
     const user = await User.findByIdAndDelete(userId);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    res.json({ message: "User deleted successfully" });
+    const lessons = await Lesson.find({ userId }).select("_id");
+    const lessonIds = lessons.map((lesson) => lesson._id);
+    const favoritesOnDeletedLessons = await Favorite.find({
+      lessonId: { $in: lessonIds },
+    }).select("userId");
+    const usersWhoSavedDeletedLessons = favoritesOnDeletedLessons.map(
+      (favorite) => favorite.userId,
+    );
+    const deletedUserFavorites = await Favorite.find({ userId }).select(
+      "lessonId",
+    );
+    const lessonsSavedByDeletedUser = deletedUserFavorites.map(
+      (favorite) => favorite.lessonId,
+    );
+
+    await Promise.all([
+      Lesson.deleteMany({ userId }),
+      Comment.deleteMany({
+        $or: [{ userId }, { lessonId: { $in: lessonIds } }],
+      }),
+      Favorite.deleteMany({
+        $or: [{ userId }, { lessonId: { $in: lessonIds } }],
+      }),
+      LessonReport.deleteMany({
+        $or: [{ reporterUserId: userId }, { lessonId: { $in: lessonIds } }],
+      }),
+      Lesson.updateMany(
+        { _id: { $in: lessonsSavedByDeletedUser }, favoritesCount: { $gt: 0 } },
+        { $inc: { favoritesCount: -1 } },
+      ),
+      User.updateMany(
+        { _id: { $in: usersWhoSavedDeletedLessons }, lessonsSaved: { $gt: 0 } },
+        { $inc: { lessonsSaved: -1 } },
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      message: "User and related data deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting user:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get platform analytics (admin only)
+export const getAdminAnalytics = async (req, res) => {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    const [
+      totalUsers,
+      premiumUsers,
+      totalLessons,
+      publicLessons,
+      privateLessons,
+      totalReports,
+      activeContributors,
+      newLessons,
+      featuredLessons,
+      topCategories,
+      userGrowth,
+      lessonGrowth,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isPremium: true }),
+      Lesson.countDocuments(),
+      Lesson.countDocuments({ visibility: "Public" }),
+      Lesson.countDocuments({ visibility: "Private" }),
+      LessonReport.countDocuments(),
+      Lesson.distinct("userId", { createdAt: { $gte: since } }).then(
+        (ids) => ids.length,
+      ),
+      Lesson.countDocuments({ createdAt: { $gte: since } }),
+      Lesson.countDocuments({ isFeatured: true }),
+      Lesson.aggregate([
+        { $match: { visibility: "Public" } },
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 6 },
+      ]),
+      User.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Lesson.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    res.json({
+      success: true,
+      analytics: {
+        totalUsers,
+        premiumUsers,
+        totalLessons,
+        publicLessons,
+        privateLessons,
+        totalReports,
+        activeContributors,
+        newLessons,
+        featuredLessons,
+        topCategories,
+        userGrowth,
+        lessonGrowth,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching analytics:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -143,6 +325,7 @@ export const getAllUsers = async (req, res) => {
     const users = await User.find().skip(skip).limit(limit).select("-__v");
 
     res.json({
+      success: true,
       users,
       pagination: {
         total,
@@ -153,6 +336,6 @@ export const getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };

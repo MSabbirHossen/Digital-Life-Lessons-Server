@@ -37,4 +37,14 @@ const lessonReportSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// ✅ Add database indexes for query optimization
+lessonReportSchema.index({ lessonId: 1 });
+lessonReportSchema.index({ reporterUserId: 1 });
+lessonReportSchema.index(
+  { lessonId: 1, reporterUserId: 1 },
+  { unique: true },
+);
+lessonReportSchema.index({ status: 1 });
+lessonReportSchema.index({ createdAt: -1 });
+
 export default mongoose.model("LessonReport", lessonReportSchema);

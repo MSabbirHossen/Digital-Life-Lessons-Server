@@ -18,5 +18,7 @@ const favoriteSchema = new mongoose.Schema(
 
 // Create unique index to prevent duplicate favorites
 favoriteSchema.index({ userId: 1, lessonId: 1 }, { unique: true });
+favoriteSchema.index({ userId: 1, createdAt: -1 });
+favoriteSchema.index({ lessonId: 1 });
 
 export default mongoose.model("Favorite", favoriteSchema);
