@@ -45,18 +45,23 @@ app.use((req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-// Start server
-const startServer = async () => {
-  try {
-    await connectDB();
-    app.listen(config.port, () => {
-      console.log(`🚀 Server running on port ${config.port}`);
-      console.log(`📡 API: http://localhost:${config.port}/api`);
-    });
-  } catch (error) {
-    console.error("Failed to start server:", error.message);
-    process.exit(1);
-  }
-};
+// Export app for Vercel serverless functions
+export default app;
 
-startServer();
+// Start server only if not in serverless environment
+if (process.env.VERCEL === undefined) {
+  const startServer = async () => {
+    try {
+      await connectDB();
+      app.listen(config.port, () => {
+        console.log(`🚀 Server running on port ${config.port}`);
+        console.log(`📡 API: http://localhost:${config.port}/api`);
+      });
+    } catch (error) {
+      console.error("Failed to start server:", error.message);
+      process.exit(1);
+    }
+  };
+
+  startServer();
+}
