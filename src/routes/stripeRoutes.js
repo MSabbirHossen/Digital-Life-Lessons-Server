@@ -4,6 +4,19 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+router.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Stripe API is running",
+    endpoints: {
+      createCheckoutSession: "POST /api/stripe/create-checkout-session",
+      verifyPayment: "POST /api/stripe/verify-payment",
+      paymentStatus: "GET /api/stripe/payment-status",
+      webhook: "POST /api/stripe/webhook",
+    },
+  });
+});
+
 // Create checkout session
 router.post(
   "/create-checkout-session",

@@ -16,6 +16,7 @@ import {
 const router = express.Router();
 
 // Public routes for browsing
+router.get("/", lessonController.getPublicLessons);
 router.get("/public", lessonController.getPublicLessons);
 router.get("/featured", lessonController.getFeaturedLessons);
 

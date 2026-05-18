@@ -70,6 +70,42 @@ app.use(
 app.use(express.json({ limit: "10mb" })); // Set body size limit
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Digital Life Lessons API is running",
+    health: "/api/health",
+  });
+});
+
+// Health check
+app.get("/api/health", (req, res) => {
+  res.json({ success: true, message: "Server is running" });
+});
+
+app.get("/api", (req, res) => {
+  res.json({
+    success: true,
+    message: "Digital Life Lessons API is running",
+    endpoints: {
+      health: "/api/health",
+      auth: "/api/auth",
+      lessons: "/api/lessons",
+      publicLessons: "/api/lessons/public",
+      stripe: "/api/stripe",
+    },
+  });
+});
+
+app.use("/api", async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/lessons", lessonRoutes);

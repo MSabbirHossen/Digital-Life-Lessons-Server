@@ -5,6 +5,19 @@ import { authLimiter } from "../middleware/rateLimitMiddleware.js";
 
 const router = express.Router();
 
+router.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Auth API is running",
+    endpoints: {
+      register: "POST /api/auth/register",
+      me: "GET /api/auth/me",
+      updateProfile: "PUT /api/auth/profile",
+      userProfile: "GET /api/auth/profile/:id",
+    },
+  });
+});
+
 // Public routes - with rate limiting
 router.post("/register", authLimiter, authController.registerUser);
 
