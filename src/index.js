@@ -2,6 +2,7 @@ import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import { config } from "./config/config.js";
 import { connectDB } from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -23,6 +24,7 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
+app.use(compression());
 
 app.use((req, res, next) => {
   const start = Date.now();
