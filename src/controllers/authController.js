@@ -4,16 +4,19 @@ import Lesson from "../models/Lesson.js";
 import Favorite from "../models/Favorite.js";
 import Comment from "../models/Comment.js";
 import LessonReport from "../models/LessonReport.js";
+import { escapeRegex, makePagination, parsePagination } from "../utils/queryUtils.js";
 
 // Register or update user in database
 export const registerUser = async (req, res) => {
   try {
-    const { uid, name, email, photoURL } = req.body;
+    const uid = req.user.uid;
+    const email = req.user.email;
+    const { name, photoURL } = req.body;
 
-    if (!uid || !name || !email) {
+    if (!uid || !email) {
       return res
         .status(400)
-        .json({ success: false, message: "Missing required fields" });
+        .json({ success: false, message: "Missing authenticated user data" });
     }
 
     let user = await User.findOne({ uid });
@@ -21,7 +24,7 @@ export const registerUser = async (req, res) => {
     if (!user) {
       user = new User({
         uid,
-        name,
+        name: name || req.user.name || email.split("@")[0],
         email,
         photoURL: photoURL || "",
       });
@@ -32,7 +35,7 @@ export const registerUser = async (req, res) => {
     }
 
     // Update existing user
-    user.name = name;
+    if (name) user.name = name;
     user.photoURL = photoURL || user.photoURL;
     await user.save();
 
@@ -317,12 +320,25 @@ export const getAdminAnalytics = async (req, res) => {
 // Get all users (admin only, with pagination)
 export const getAllUsers = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query, {
+      limit: 10,
+      maxLimit: 50,
+    });
+    const query = {};
+    if (req.query.search) {
+      const safeSearch = escapeRegex(String(req.query.search).trim().slice(0, 80));
+      query.$or = [
+        { name: { $regex: safeSearch, $options: "i" } },
+        { email: { $regex: safeSearch, $options: "i" } },
+      ];
+    }
 
-    const total = await User.countDocuments();
-    const users = await User.find().skip(skip).limit(limit).select("-__v");
+    const total = await User.countDocuments(query);
+    const users = await User.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select("-__v");
 
     res.json({
       success: true,
@@ -331,7 +347,7 @@ export const getAllUsers = async (req, res) => {
         total,
         page,
         limit,
-        pages: Math.ceil(total / limit),
+        ...makePagination(total, page, limit),
       },
     });
   } catch (error) {

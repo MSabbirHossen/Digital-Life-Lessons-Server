@@ -157,6 +157,19 @@ export const validateCommentMiddleware = (req, res, next) => {
   next();
 };
 
+export const validateUserProfileMiddleware = (req, res, next) => {
+  const errors = validateUserProfile(req.body);
+
+  if (errors.length > 0) {
+    return res.status(400).json({ success: false, errors });
+  }
+
+  if (req.body.name) req.body.name = validator.trim(req.body.name);
+  if (req.body.photoURL) req.body.photoURL = validator.trim(req.body.photoURL);
+
+  next();
+};
+
 export const validateReportMiddleware = (req, res, next) => {
   const errors = validateReport(req.body);
 
