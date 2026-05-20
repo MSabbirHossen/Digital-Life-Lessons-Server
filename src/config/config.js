@@ -27,7 +27,9 @@ export const config = {
   port: parseInt(process.env.PORT) || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
   mongodbUri: process.env.MONGODB_URI,
+  mongodbDbName: process.env.MONGODB_DB_NAME || "lessonDB",
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
+  adminEmail: process.env.ADMIN_EMAIL || "databaseadmin1@gmail.com",
   primaryClientUrl:
     (process.env.CLIENT_URL || "http://localhost:5173").split(",")[0]?.trim() ||
     "http://localhost:5173",
