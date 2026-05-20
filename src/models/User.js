@@ -24,10 +24,14 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "moderator"],
       default: "user",
     },
     isPremium: {
+      type: Boolean,
+      default: false,
+    },
+    specialBadge: {
       type: Boolean,
       default: false,
     },

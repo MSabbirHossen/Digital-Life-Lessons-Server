@@ -1,10 +1,15 @@
 import User from "../models/User.js";
+import { config } from "../config/config.js";
 import admin from "../config/firebase.js";
 import Lesson from "../models/Lesson.js";
 import Favorite from "../models/Favorite.js";
 import Comment from "../models/Comment.js";
 import LessonReport from "../models/LessonReport.js";
-import { escapeRegex, makePagination, parsePagination } from "../utils/queryUtils.js";
+import {
+  escapeRegex,
+  makePagination,
+  parsePagination,
+} from "../utils/queryUtils.js";
 
 // Register or update user in database
 export const registerUser = async (req, res) => {
@@ -22,12 +27,22 @@ export const registerUser = async (req, res) => {
     let user = await User.findOne({ uid });
 
     if (!user) {
-      user = new User({
+      const newUserData = {
         uid,
         name: name || req.user.name || email.split("@")[0],
         email,
         photoURL: photoURL || "",
-      });
+      };
+
+      // Auto-promote to admin if email matches configured admin email
+      if (
+        email &&
+        email.toLowerCase() === (config.adminEmail || "").toLowerCase()
+      ) {
+        newUserData.role = "admin";
+      }
+
+      user = new User(newUserData);
       await user.save();
       return res
         .status(201)
@@ -172,6 +187,66 @@ export const promoteToAdmin = async (req, res) => {
     res.json({ success: true, message: "User promoted to admin", user });
   } catch (error) {
     console.error("Error promoting user:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Assign any role (admin/moderator/user)
+export const assignRole = async (req, res) => {
+  try {
+    const { userId, role } = req.body;
+    if (!["user", "admin", "moderator"].includes(role)) {
+      return res.status(400).json({ success: false, message: "Invalid role" });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { role }, { new: true });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    res.json({ success: true, message: "Role updated", user });
+  } catch (error) {
+    console.error("Error assigning role:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Toggle premium status (admin only)
+export const togglePremium = async (req, res) => {
+  try {
+    const { userId, isPremium } = req.body;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isPremium: !!isPremium },
+      { new: true },
+    );
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    res.json({ success: true, message: "User premium status updated", user });
+  } catch (error) {
+    console.error("Error toggling premium:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Set or remove special badge for a user (admin only)
+export const setSpecialBadge = async (req, res) => {
+  try {
+    const { userId, specialBadge } = req.body;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { specialBadge: !!specialBadge },
+      { new: true },
+    );
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    res.json({ success: true, message: "User badge updated", user });
+  } catch (error) {
+    console.error("Error setting badge:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -326,7 +401,9 @@ export const getAllUsers = async (req, res) => {
     });
     const query = {};
     if (req.query.search) {
-      const safeSearch = escapeRegex(String(req.query.search).trim().slice(0, 80));
+      const safeSearch = escapeRegex(
+        String(req.query.search).trim().slice(0, 80),
+      );
       query.$or = [
         { name: { $regex: safeSearch, $options: "i" } },
         { email: { $regex: safeSearch, $options: "i" } },

@@ -39,7 +39,11 @@ router.get(
   validateObjectIdParam("id"),
   authController.getUserById,
 );
-router.get("/user/:id", validateObjectIdParam("id"), authController.getUserById);
+router.get(
+  "/user/:id",
+  validateObjectIdParam("id"),
+  authController.getUserById,
+);
 
 // Admin routes
 router.get(
@@ -67,6 +71,27 @@ router.post(
   verifyAdmin,
   validateObjectIdBody("userId"),
   authController.deleteUser,
+);
+router.post(
+  "/admin/assign-role",
+  verifyToken,
+  verifyAdmin,
+  validateObjectIdBody("userId"),
+  authController.assignRole,
+);
+router.post(
+  "/admin/toggle-premium",
+  verifyToken,
+  verifyAdmin,
+  validateObjectIdBody("userId"),
+  authController.togglePremium,
+);
+router.post(
+  "/admin/set-badge",
+  verifyToken,
+  verifyAdmin,
+  validateObjectIdBody("userId"),
+  authController.setSpecialBadge,
 );
 
 export default router;
