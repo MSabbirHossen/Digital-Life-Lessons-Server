@@ -38,8 +38,8 @@ export const createCheckoutSession = async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: `${config.clientUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.clientUrl}/payment/cancel`,
+      success_url: `${config.primaryClientUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.primaryClientUrl}/payment/cancel`,
       customer_email: user.email,
       metadata: {
         userId: user._id.toString(),
@@ -56,7 +56,7 @@ export const createCheckoutSession = async (req, res) => {
   }
 };
 
-// Verify payment and update user status
+// Read-only payment verification. Premium upgrades are applied only by webhook.
 export const verifyPayment = async (req, res) => {
   try {
     const { sessionId } = req.body;
@@ -75,14 +75,11 @@ export const verifyPayment = async (req, res) => {
         .json({ success: false, message: "Payment not completed" });
     }
 
-    const userId = session.metadata.userId;
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { isPremium: true },
-      { new: true },
-    );
-
-    res.json({ success: true, message: "Payment verified successfully", user });
+    res.json({
+      success: true,
+      paid: true,
+      message: "Payment completed. Premium activation is handled by webhook.",
+    });
   } catch (error) {
     console.error("Error verifying payment:", error);
     res
@@ -123,14 +120,25 @@ export const handleStripeWebhook = async (req, res) => {
 
       // ✅ Verify payment status before updating
       if (session.payment_status === "paid") {
-        const userId = session.metadata.userId;
+        const userId = session.metadata?.userId;
+        if (!userId) {
+          throw new Error("Stripe session missing userId metadata");
+        }
 
         try {
           const user = await User.findByIdAndUpdate(
             userId,
-            { isPremium: true },
+            {
+              isPremium: true,
+              stripeCustomerId: session.customer || null,
+              stripeSessionId: session.id,
+            },
             { new: true },
           );
+
+          if (!user) {
+            throw new Error(`User not found for Stripe metadata userId ${userId}`);
+          }
 
           // ✅ Log successful webhook processing
           await WebhookLog.create({

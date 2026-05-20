@@ -28,6 +28,9 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   mongodbUri: process.env.MONGODB_URI,
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
+  primaryClientUrl:
+    (process.env.CLIENT_URL || "http://localhost:5173").split(",")[0]?.trim() ||
+    "http://localhost:5173",
 
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
