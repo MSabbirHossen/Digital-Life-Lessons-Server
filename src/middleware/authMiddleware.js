@@ -22,6 +22,24 @@ export const verifyToken = async (req, res, next) => {
   }
 };
 
+export const optionalVerifyToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split("Bearer ")[1];
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    req.user = await admin.auth().verifyIdToken(token);
+    return next();
+  } catch (error) {
+    console.error("Optional token verification error:", error.message);
+    return res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired token" });
+  }
+};
+
 export const verifyAdmin = async (req, res, next) => {
   if (!req.user) {
     return res

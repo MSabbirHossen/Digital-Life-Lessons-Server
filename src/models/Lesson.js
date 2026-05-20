@@ -92,5 +92,6 @@ lessonSchema.index({ createdAt: -1 });
 lessonSchema.index({ favoritesCount: -1 });
 lessonSchema.index({ visibility: 1, accessLevel: 1 });
 lessonSchema.index({ isFeatured: 1 });
+lessonSchema.index({ title: "text", description: "text" });
 
 export default mongoose.model("Lesson", lessonSchema);
