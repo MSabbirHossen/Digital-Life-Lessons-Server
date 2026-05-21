@@ -21,7 +21,9 @@ export const addFavorite = async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
   if (!canInteractWithLesson(lesson, user)) {
     return res.status(403).json({
@@ -67,7 +69,9 @@ export const removeFavorite = async (req, res) => {
   });
 
   if (!favorite) {
-    return res.status(404).json({ success: false, message: "Favorite not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Favorite not found" });
   }
 
   await Promise.all([
@@ -104,7 +108,10 @@ export const getUserFavorites = async (req, res) => {
     .populate({
       path: "lessonId",
       match: lessonFilter,
-      populate: { path: "userId", select: "name email photoURL lessonsCreated" },
+      populate: {
+        path: "userId",
+        select: "name email photoURL lessonsCreated",
+      },
     })
     .sort({ createdAt: -1 });
 
@@ -148,7 +155,15 @@ export const reportLesson = async (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
+  }
+  if (lesson.userId.toString() === user._id.toString()) {
+    return res.status(403).json({
+      success: false,
+      message: "You cannot report your own lesson",
+    });
   }
   if (!canInteractWithLesson(lesson, user)) {
     return res.status(403).json({
@@ -207,7 +222,9 @@ export const getAllReports = async (req, res) => {
 export const deleteReportedLesson = async (req, res) => {
   const lesson = await deleteLessonCascade(req.params.lessonId);
   if (!lesson) {
-    return res.status(404).json({ success: false, message: "Lesson not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Lesson not found" });
   }
 
   return res.json({
@@ -224,7 +241,9 @@ export const resolveReport = async (req, res) => {
   );
 
   if (!report) {
-    return res.status(404).json({ success: false, message: "Report not found" });
+    return res
+      .status(404)
+      .json({ success: false, message: "Report not found" });
   }
 
   return res.json({
