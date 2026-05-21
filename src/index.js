@@ -18,6 +18,50 @@ import stripeRoutes from "./routes/stripeRoutes.js";
 
 const app = express();
 
+const allowedOrigins = (() => {
+  const configuredOrigins = config.clientUrl
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  if (config.nodeEnv === "production") {
+    return [config.primaryClientUrl].filter(Boolean);
+  }
+
+  return Array.from(
+    new Set([
+      ...configuredOrigins,
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ]),
+  );
+})();
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (config.nodeEnv !== "production") {
+      console.log("Incoming Origin:", origin);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    if (config.nodeEnv !== "production") {
+      // Development fallback: do not fail local workflows for unexpected local origins.
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
 // ✅ Security headers via Helmet
 app.use(
   helmet({
@@ -40,23 +84,8 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(
-  cors({
-    origin(origin, callback) {
-      const allowedOrigins = config.clientUrl
-        .split(",")
-        .map((url) => url.trim())
-        .filter(Boolean);
-
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ✅ General rate limiting
 app.use(generalLimiter);
